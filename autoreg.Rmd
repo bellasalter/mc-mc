@@ -1,0 +1,187 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+# Dependencies
+library(ggplot2)
+library(LaplacesDemon)
+```
+
+```{r}
+states_visited <- c()
+acfs <- c()
+
+# General layout of stochastic process
+sim_steps <- function(start_state, acfs, get_next_step, iters = 1000) {
+  curr_state <- start_state
+  path <- c()
+  for(i in c(1:iters)) {
+    path <- append(path,curr_state)
+    curr_state <- get_next_step(curr_state)
+  }
+  acf_vals <- acf(path, plot=FALSE)$acf
+  sum_acf <- mean(acf_vals)
+  acfs <<- append(acfs, sum_acf)
+  return(path)
+}
+
+ est_sim <- function(start_gen, get_next_step, num_steps) {
+  results <- c()
+  last_states <- c()
+  for(i in c(1:100)) {
+    init_state <- start_gen()
+    states_visited <<- sim_steps(init_state, acfs, get_next_step, num_steps)
+    last_states <- append(last_states, states_visited[length(states_visited)])
+    res <- mean(states_visited)
+    results <- append(results, res)
+  }
+  var_phi <- sd(results)
+  ac <- acf(results, type = "covariance", plot=FALSE)
+  return(last_states)
+}
+
+```
+```{r}
+# Specific to autoregression 
+a = 0.99
+b = 2
+steps = 10000
+
+get_next_step <- function(prev) {
+  w <- rnorm(n=1, mean=0, sd=1)
+  next_val <- a * prev + b * w
+  return(next_val)
+}
+
+get_init_state <- function() {
+  init_sd <- b^2 / (1-a^2)
+  init_state <- rnorm(n=1, mean=0, sd=init_sd)
+  return(init_state)
+}
+
+last_states <- est_sim(get_init_state, get_next_step, steps)
+```
+```{r}
+exp_sd <- b^2 / (1-a^2)
+sprintf("Mean: %f, Variance: %f, expected variance: %f", mean(states_visited), sd(states_visited)^2, exp_sd)
+state_df <- data.frame(states_visited)
+ggplot(state_df, aes(x=states_visited)) + geom_histogram() + stat_function(fun = dnorm,args = with(state_df, c(mean = 0, sd=exp_sd)))
+```
+
+
+```{r}
+lambda <- function(t, M) {
+  if (t < M) {
+    retVal <- 1 - (t/M)
+    return(retVal)
+  } else {
+    return(0)
+  }
+}
+```
+
+```{r}
+acf_ag <- acf(states_visited, lag.max = length(states_visited))
+t_int <- function(n, acf_all) {
+  start_ind <- 1-n
+  end_ind <- n-1
+  sum <- 0
+  for (t in start_ind:end_ind) {
+    # PROBLEM: R doesn't do the autocorrelation for negative numbers but should be the same as positive?
+    p_hat <- acf_all$acf[abs(t)+1] / acf_all$acf[1] #this should divide C(t) / C(0), check docsp
+    new_term <- lambda(t, n)*p_hat
+    sum <- sum + new_term
+  }
+  return(0.5*sum)
+}
+
+t_int_series <- function(n_series, acf_all) {
+  retVal <- c()
+  for(n in n_series) {
+    to_add <- t_int(n,acf_all)
+    retVal <- append(retVal, to_add)
+  }
+  return(retVal)
+}
+
+```
+```{r}
+# custom c_est function
+c_est <- function(visited_states, t) {
+  n <- length(visited_states)
+  const <- n- abs(t)
+  coeff <- 1 / const
+  mean_states <- mean(visited_states)
+  sum <- 0
+  for (i in 1:const) {
+    to_add <- visited_states[i] - mean_states
+    to_add <- to_add * (visited_states[i+abs(t)] - mean_states)
+    sum <- sum + to_add
+  }
+  return(coeff * sum)
+}
+
+c_est_series <- function(visited_states) {
+  retVal <- c()
+  for(i in 0:length(visited_states)) {
+    retVal <- append(retVal, c_est(visited_states, i))
+  }
+  return(retVal)
+}
+
+my_acfs <- data.frame(c_est_series(states_visited))
+colnames(my_acfs) <- c("acf")
+```
+
+```{r}
+M_upper_bound <- 10
+
+find_m <- function(acf_all) {
+  c <- 4 # since we expect an exponential here?
+  poss_Ms <- c(1:M_upper_bound)
+  t_ints <- c*t_int_series(poss_Ms, acf_all)
+  print(length(t_ints))
+  to_plot <- data.frame(poss_Ms, t_ints)
+  return(to_plot)
+}
+```
+```{r}
+
+triangle_df <- find_m(my_acfs)
+ggplot(triangle_df, aes(x=poss_Ms)) + geom_point(aes(y=t_ints, color="forestgreen"), size=0.75) + geom_line(aes(y=t_ints,color="forestgreen")) + geom_line(aes(y=poss_Ms, color="blue")) + ggtitle("Comparing M to c*Tau_int with c=6") + scale_color_manual(name = "", labels = c("M", "c*tau_int(M)"),values = c("forestgreen", "blue"))
+```
+```{r}
+M <- 6
+apply_window <- function(lambda, acf_all) {
+  c_new <- c()
+  n <- 0
+  N <- 1000
+  for (acf in acf_all$acf) {
+    rat <- lambda(n, M)
+    to_add <- rat * acf
+    c_new <- append(c_new, to_add)
+    n <- n+1
+  }
+  as_df <- data.frame(c(1:steps), c_new, acf_all$acf)
+  colnames(as_df) <- c("Lag", "C_new", "C_orig")
+  return(as_df)
+}
+
+wind_df <- apply_window(lambda, acf_ag)
+```
+```{r}
+max_x <- 1000
+
+wind_df <- wind_df[1:max_x,]
+ggplot(wind_df, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.5) + geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=C_new, color="deeppink"), size=0.5) + geom_line(aes(y=C_new, color="deeppink")) +ggtitle("Triangle windowed C vs. Lag") + scale_color_manual(name = "", labels = c("Original", "New(Triangle)"),values = c("black", "deeppink")) + xlab("Lag") + ylab("C")
+
+ll_wind <- wind_df
+ll_wind$Lag <- log(ll_wind$Lag)
+ll_wind$C_orig <- log(ll_wind$C_orig)
+ll_wind$C_new <- log(ll_wind$C_new)
+ggplot(ll_wind, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.5) +  geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=C_new, color="deeppink"), size=0.5) + geom_line(aes(y=C_new, color="deeppink")) +ggtitle("Triangle windowed C vs. Lag(Log/Log)") + scale_color_manual(name = "", labels = c("Original", "New(Triangle)"),values = c("black", "deeppink")) + xlab("Log(Lag)") + ylab("Log(C)")
+``` 
+```{r}
+IAT(states_visited)
+```
