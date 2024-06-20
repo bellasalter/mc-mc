@@ -3,10 +3,26 @@
 library(ggplot2)
 library(LaplacesDemon)
 
+# Applies the window lambda to the acfs given. 
+apply_window <- function(lambda, acf_all) {
+  c_new <- c()
+  n <- 0
+  N <- 1000
+  for (acf in acf_all$acf) {
+    rat <- lambda(n, M)
+    to_add <- rat * acf
+    c_new <- append(c_new, to_add)
+    n <- n+1
+  }
+  as_df <- data.frame(c(1:steps), c_new, acf_all$acf)
+  colnames(as_df) <- c("Lag", "C_new", "C_orig")
+  return(as_df)
+}
+
 # General layout of stochastic process. uses start_state and get_next_step to simulate iters number of steps of a stochastic process. 
 #   Input: start_state(numeric), get_next_step(function of previous step), and iters(numeric)
 #   Returns: path of stochastic process
-sim_steps <- function(start_state, get_next_step, iters = 1000) {
+asim <- function(start_state, get_next_step, iters = 1000) {
   curr_state <- start_state
   path <- c()
   for(i in c(1:iters)) {
@@ -14,10 +30,39 @@ sim_steps <- function(start_state, get_next_step, iters = 1000) {
     curr_state <- get_next_step(curr_state)
   }
   #acf_vals <- acf(path, plot=FALSE)$acf
-  sum_acf <- mean(acf_vals)
+  #sum_acf <- mean(acf_vals)
   #acfs <<- append(acfs, sum_acf)
   return(path)
 }
+
+# Estimates C(t) for the given visited states and time lag. 
+#   Returns: C(t)
+c_est <- function(visited_states, t) {
+  n <- length(visited_states)
+  const <- n- abs(t)
+  coeff <- 1 / const
+  mean_states <- mean(visited_states)
+  sum <- 0
+  for (i in 1:const) {
+    to_add <- visited_states[i] - mean_states
+    to_add <- to_add * (visited_states[i+abs(t)] - mean_states)
+    sum <- sum + to_add
+  }
+  return(coeff * sum)
+}
+
+# Estimates C(t) for each value in the list. 
+#   Returns: a dataframe with one column, titled acf
+c_est_series <- function(visited_states) {
+  retVal <- c()
+  for(i in 0:length(visited_states)) {
+    retVal <- append(retVal, c_est(visited_states, i))
+  }
+  ret_acfs <- data.frame(retVal)
+  colnames(ret_acfs) <- c("acf")
+  return(ret_acfs)
+}
+
 
 # Estimates the mean state of generated path with 100 simulations. 
 #   Inputs: start_gen(function generating the start state based on stationary dist. ), get_next_step, num_steps, and states_visited(list to       store the path) 
@@ -27,7 +72,7 @@ est_sim <- function(start_gen, get_next_step, num_steps, states_visited) {
   last_states <- c()
   for(i in c(1:1000)) {
     init_state <- start_gen()
-    states_visited <<- sim_steps(init_state, acfs, get_next_step, num_steps)
+    states_visited <<- asim(init_state, acfs, get_next_step, num_steps)
     last_states <- append(last_states, states_visited[length(states_visited)])
     res <- mean(states_visited)
     results <- append(results, res)
@@ -36,6 +81,57 @@ est_sim <- function(start_gen, get_next_step, num_steps, states_visited) {
   ac <- acf(results, type = "covariance", plot=FALSE)
   return(var_phi)
 }
+
+# Plots the estimated c*tau_int(M) vs. M for comparison to determine autocorrelation time. 
+#   Returns: the dataframe used to plot. 
+find_m <- function(acf_all, c, M_upper_bound) { 
+  poss_Ms <- c(1:M_upper_bound)
+  t_ints <- c*t_int_series(poss_Ms, acf_all)
+  print(length(t_ints))
+  to_plot <- data.frame(poss_Ms, t_ints)
+  return(to_plot)
+}
+
+# Serves as the lambda function for windowing the acf. 
+#   Inputs: t, the lag(numeric), M, the autocorrelation time(numeric), and type(string), default t for triangle
+#   Returns: lambda(t)
+lambda <- function(t, M, type="t") {
+  if (t < M) {
+    retVal <- 1 - (t/M)
+    return(retVal)
+  } else {
+    return(0)
+  }
+}
+
+# Finds tau_int for the given N and acfs based on formula from Sokal
+t_int <- function(n, acf_all) {
+  start_ind <- 1-n
+  end_ind <- n-1
+  sum <- 0
+  for (t in start_ind:end_ind) {
+    p_hat <- acf_all$acf[abs(t)+1] / acf_all$acf[1] 
+    new_term <- lambda(t, n)*p_hat
+    sum <- sum + new_term
+  }
+  return(0.5*sum)
+}
+
+# Finds tau_int for each item in a list. 
+t_int_series <- function(n_series, acf_all) {
+  retVal <- c()
+  for(n in n_series) {
+    to_add <- t_int(n,acf_all)
+    retVal <- append(retVal, to_add)
+  }
+  return(retVal)
+}
+
+
+
+
+
+
 
 
 

@@ -12,13 +12,12 @@ source("./generic.R")
 ```{r}
 states_visited <- c()
 acfs <- c()
-
 ```
 ```{r}
 # Specific to autoregression 
 a = 0.5
 b = 2
-steps = 100000
+steps = 10000
 
 get_next_step <- function(prev) {
   w <- rnorm(n=1, mean=0, sd=1)
@@ -32,7 +31,7 @@ get_init_state <- function() {
   return(init_state)
 }
 
-states_visited <- sim_steps(get_init_state(), get_next_step, steps)
+states_visited <- asim(get_init_state(), get_next_step, steps)
 ```
 ```{r}
 exp_sd <- b^2 / (1-a^2)
@@ -41,105 +40,17 @@ state_df <- data.frame(states_visited)
 ggplot(state_df, aes(x=states_visited)) + geom_histogram() + stat_function(fun = dnorm,args = with(state_df, c(mean = 0, sd=exp_sd)))
 ```
 
-
-```{r}
-lambda <- function(t, M) {
-  if (t < M) {
-    retVal <- 1 - (t/M)
-    return(retVal)
-  } else {
-    return(0)
-  }
-}
-```
-
-```{r}
-acf_ag <- acf(states_visited, lag.max = length(states_visited))
-t_int <- function(n, acf_all) {
-  start_ind <- 1-n
-  end_ind <- n-1
-  sum <- 0
-  for (t in start_ind:end_ind) {
-    # PROBLEM: R doesn't do the autocorrelation for negative numbers but should be the same as positive?
-    p_hat <- acf_all$acf[abs(t)+1] / acf_all$acf[1] #this should divide C(t) / C(0), check docsp
-    new_term <- lambda(t, n)*p_hat
-    sum <- sum + new_term
-  }
-  return(0.5*sum)
-}
-
-t_int_series <- function(n_series, acf_all) {
-  retVal <- c()
-  for(n in n_series) {
-    to_add <- t_int(n,acf_all)
-    retVal <- append(retVal, to_add)
-  }
-  return(retVal)
-}
-
-```
-```{r}
-# custom c_est function
-c_est <- function(visited_states, t) {
-  n <- length(visited_states)
-  const <- n- abs(t)
-  coeff <- 1 / const
-  mean_states <- mean(visited_states)
-  sum <- 0
-  for (i in 1:const) {
-    to_add <- visited_states[i] - mean_states
-    to_add <- to_add * (visited_states[i+abs(t)] - mean_states)
-    sum <- sum + to_add
-  }
-  return(coeff * sum)
-}
-
-c_est_series <- function(visited_states) {
-  retVal <- c()
-  for(i in 0:length(visited_states)) {
-    retVal <- append(retVal, c_est(visited_states, i))
-  }
-  return(retVal)
-}
-
-my_acfs <- data.frame(c_est_series(states_visited))
-colnames(my_acfs) <- c("acf")
-```
-
 ```{r}
 M_upper_bound <- 10
-
-find_m <- function(acf_all) {
-  c <- 4 # since we expect an exponential here?
-  poss_Ms <- c(1:M_upper_bound)
-  t_ints <- c*t_int_series(poss_Ms, acf_all)
-  print(length(t_ints))
-  to_plot <- data.frame(poss_Ms, t_ints)
-  return(to_plot)
-}
+c <- 4 # since we expect an exponential here?
 ```
-```{r}
 
-triangle_df <- find_m(my_acfs)
+```{r}
+triangle_df <- find_m(my_acfs, c, M_upper_bound)
 ggplot(triangle_df, aes(x=poss_Ms)) + geom_point(aes(y=t_ints, color="forestgreen"), size=0.75) + geom_line(aes(y=t_ints,color="forestgreen")) + geom_line(aes(y=poss_Ms, color="blue")) + ggtitle("Comparing M to c*Tau_int with c=6") + scale_color_manual(name = "", labels = c("M", "c*tau_int(M)"),values = c("forestgreen", "blue"))
 ```
 ```{r}
 M <- 6
-apply_window <- function(lambda, acf_all) {
-  c_new <- c()
-  n <- 0
-  N <- 1000
-  for (acf in acf_all$acf) {
-    rat <- lambda(n, M)
-    to_add <- rat * acf
-    c_new <- append(c_new, to_add)
-    n <- n+1
-  }
-  as_df <- data.frame(c(1:steps), c_new, acf_all$acf)
-  colnames(as_df) <- c("Lag", "C_new", "C_orig")
-  return(as_df)
-}
-
 wind_df <- apply_window(lambda, acf_ag)
 ```
 ```{r}
