@@ -6,47 +6,19 @@ output: html_notebook
 # Dependencies
 library(ggplot2)
 library(LaplacesDemon)
+source("./generic.R")
 ```
 
 ```{r}
 states_visited <- c()
 acfs <- c()
 
-# General layout of stochastic process
-sim_steps <- function(start_state, acfs, get_next_step, iters = 1000) {
-  curr_state <- start_state
-  path <- c()
-  for(i in c(1:iters)) {
-    path <- append(path,curr_state)
-    curr_state <- get_next_step(curr_state)
-  }
-  acf_vals <- acf(path, plot=FALSE)$acf
-  sum_acf <- mean(acf_vals)
-  acfs <<- append(acfs, sum_acf)
-  return(path)
-}
-
- est_sim <- function(start_gen, get_next_step, num_steps) {
-  results <- c()
-  last_states <- c()
-  for(i in c(1:100)) {
-    init_state <- start_gen()
-    states_visited <<- sim_steps(init_state, acfs, get_next_step, num_steps)
-    last_states <- append(last_states, states_visited[length(states_visited)])
-    res <- mean(states_visited)
-    results <- append(results, res)
-  }
-  var_phi <- sd(results)
-  ac <- acf(results, type = "covariance", plot=FALSE)
-  return(last_states)
-}
-
 ```
 ```{r}
 # Specific to autoregression 
-a = 0.99
+a = 0.5
 b = 2
-steps = 10000
+steps = 100000
 
 get_next_step <- function(prev) {
   w <- rnorm(n=1, mean=0, sd=1)
@@ -60,7 +32,7 @@ get_init_state <- function() {
   return(init_state)
 }
 
-last_states <- est_sim(get_init_state, get_next_step, steps)
+states_visited <- sim_steps(get_init_state(), get_next_step, steps)
 ```
 ```{r}
 exp_sd <- b^2 / (1-a^2)
