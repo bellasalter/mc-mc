@@ -15,9 +15,9 @@ acfs <- c()
 ```
 ```{r}
 # Specific to autoregression 
-a = 0.5
+a = 0.9995
 b = 2
-steps = 10000
+steps = 40000
 
 get_next_step <- function(prev) {
   w <- rnorm(n=1, mean=0, sd=1)
@@ -41,30 +41,35 @@ ggplot(state_df, aes(x=states_visited)) + geom_histogram() + stat_function(fun =
 ```
 
 ```{r}
-M_upper_bound <- 10
 c <- 4 # since we expect an exponential here?
+my_acfs <- c_est_series(states_visited)
+```
+```{r}
+#my_acfs$acf
+weird_num <- c_est(states_visited, 396)
 ```
 
 ```{r}
+M_upper_bound <- 30000
 triangle_df <- find_m(my_acfs, c, M_upper_bound)
-ggplot(triangle_df, aes(x=poss_Ms)) + geom_point(aes(y=t_ints, color="forestgreen"), size=0.75) + geom_line(aes(y=t_ints,color="forestgreen")) + geom_line(aes(y=poss_Ms, color="blue")) + ggtitle("Comparing M to c*Tau_int with c=6") + scale_color_manual(name = "", labels = c("M", "c*tau_int(M)"),values = c("forestgreen", "blue"))
+length(triangle_df)
+ggplot(triangle_df, aes(x=poss_Ms)) + geom_point(aes(y=ct_ints, color="forestgreen"), size=0.75) + geom_line(aes(y=ct_ints,color="forestgreen")) + geom_line(aes(y=poss_Ms, color="blue")) + ggtitle("Comparing M to c*Tau_int with c=6") + scale_color_manual(name = "", labels = c("M", "c*tau_int(M)"),values = c("forestgreen", "blue"))
+m_suggest <- triangle_df[triangle_df$poss_Ms >= triangle_df$ct_ints,]
+m_suggest <- m_suggest$poss_Ms[1]
+exp_m <- 1 + 2*(a/(1-a))
+sprintf("Suggested M: %f, expected %f", m_suggest, exp_m)
 ```
 ```{r}
-M <- 6
-wind_df <- apply_window(lambda, acf_ag)
+M <- m_suggest
+wind_df <- apply_window(lambda, my_acfs, M)
 ```
 ```{r}
-max_x <- 1000
+max_x <- steps / 2
 
-wind_df <- wind_df[1:max_x,]
-ggplot(wind_df, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.5) + geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=C_new, color="deeppink"), size=0.5) + geom_line(aes(y=C_new, color="deeppink")) +ggtitle("Triangle windowed C vs. Lag") + scale_color_manual(name = "", labels = c("Original", "New(Triangle)"),values = c("black", "deeppink")) + xlab("Lag") + ylab("C")
-
-ll_wind <- wind_df
-ll_wind$Lag <- log(ll_wind$Lag)
-ll_wind$C_orig <- log(ll_wind$C_orig)
-ll_wind$C_new <- log(ll_wind$C_new)
-ggplot(ll_wind, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.5) +  geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=C_new, color="deeppink"), size=0.5) + geom_line(aes(y=C_new, color="deeppink")) +ggtitle("Triangle windowed C vs. Lag(Log/Log)") + scale_color_manual(name = "", labels = c("Original", "New(Triangle)"),values = c("black", "deeppink")) + xlab("Log(Lag)") + ylab("Log(C)")
-``` 
+plot_df <- wind_df[1:max_x,]
+ggplot(plot_df, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.25) + geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=C_new, color="deeppink"), size=0.25) + geom_line(aes(y=C_new, color="deeppink")) +ggtitle("Triangle windowed C vs. Lag") + scale_color_manual(name = "", labels = c("Original", "New(Triangle)"),values = c("black", "deeppink")) + xlab("Lag") + ylab("C")
+```
 ```{r}
 IAT(states_visited)
 ```
+

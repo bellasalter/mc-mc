@@ -4,7 +4,7 @@ library(ggplot2)
 library(LaplacesDemon)
 
 # Applies the window lambda to the acfs given. 
-apply_window <- function(lambda, acf_all) {
+apply_window <- function(lambda, acf_all, M) {
   c_new <- c()
   n <- 0
   N <- 1000
@@ -39,13 +39,17 @@ asim <- function(start_state, get_next_step, iters = 1000) {
 #   Returns: C(t)
 c_est <- function(visited_states, t) {
   n <- length(visited_states)
-  const <- n- abs(t)
+  const <- n - abs(t)
   coeff <- 1 / const
+  #sprintf("const: %f, coeff: %f", const, coeff)
   mean_states <- mean(visited_states)
   sum <- 0
   for (i in 1:const) {
-    to_add <- visited_states[i] - mean_states
-    to_add <- to_add * (visited_states[i+abs(t)] - mean_states)
+    to_add1 <- visited_states[i] - mean_states
+    #print(to_add)
+    to_add2 <- visited_states[i+abs(t)] - mean_states
+    to_add <- to_add1 * to_add2
+    #print(to_add)
     sum <- sum + to_add
   }
   return(coeff * sum)
@@ -86,9 +90,9 @@ est_sim <- function(start_gen, get_next_step, num_steps, states_visited) {
 #   Returns: the dataframe used to plot. 
 find_m <- function(acf_all, c, M_upper_bound) { 
   poss_Ms <- c(1:M_upper_bound)
-  t_ints <- c*t_int_series(poss_Ms, acf_all)
-  print(length(t_ints))
-  to_plot <- data.frame(poss_Ms, t_ints)
+  ct_ints <- c*t_int_series(poss_Ms, acf_all)
+  print(length(ct_ints))
+  to_plot <- data.frame(poss_Ms, ct_ints)
   return(to_plot)
 }
 
@@ -111,10 +115,11 @@ t_int <- function(n, acf_all) {
   sum <- 0
   for (t in start_ind:end_ind) {
     p_hat <- acf_all$acf[abs(t)+1] / acf_all$acf[1] 
-    new_term <- lambda(t, n)*p_hat
+    new_term <- lambda(abs(t), n)*p_hat
     sum <- sum + new_term
   }
-  return(0.5*sum)
+  retVal <- 0.5 *sum
+  return(retVal)
 }
 
 # Finds tau_int for each item in a list. 
