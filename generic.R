@@ -69,7 +69,7 @@ c_est_series <- function(visited_states) {
 
 
 # Estimates the mean state of generated path with 100 simulations. 
-#   Inputs: start_gen(function generating the start state based on stationary dist. ), get_next_step, num_steps, and states_visited(list to       store the path) 
+#   Inputs: start_gen(function generating the start state based on stationary dist. ), get_next_step, num_steps, and states_visited(list to store the path) 
 #   Returns: variance of the mean
 est_sim <- function(start_gen, get_next_step, num_steps, states_visited) {
   results <- c()
@@ -91,7 +91,7 @@ est_sim <- function(start_gen, get_next_step, num_steps, states_visited) {
 find_m <- function(acf_all, c, M_upper_bound) { 
   poss_Ms <- c(1:M_upper_bound)
   ct_ints <- c*t_int_series(poss_Ms, acf_all)
-  print(length(ct_ints))
+  #print(length(ct_ints))
   to_plot <- data.frame(poss_Ms, ct_ints)
   return(to_plot)
 }
@@ -132,11 +132,68 @@ t_int_series <- function(n_series, acf_all) {
   return(retVal)
 }
 
+get_lhs_weights <- function(results) {
+  weights <- c()
+  unique_lhs <- unique(results$xL)
+  for(lhs in unique_lhs) {
+    selected <- results[results$xL == lhs,]
+    weight <- max(selected$new_weight)
+    weights <- append(weights, weight)
+  }
+  retVal <- data.frame(unique_lhs, weights)
+  return(retVal)
+}
+
+get_rhs_weights <- function(results) {
+  weights <- c()
+  unique_rhs <- unique(results$xR)
+  for(rhs in unique_rhs) {
+    selected <- results[results$xR == rhs,]
+    weight <- max(selected$new_weight)
+    weights <- append(weights, weight)
+  }
+  retVal <- data.frame(unique_rhs, weights)
+  return(retVal)
+}
 
 
+# acfs turn negative, so find first time and discard those data points
+get_log <- function(acfs) {
+  return(log(abs(acfs)))
+}
+
+generate_piecewise <- function(x) {
+  y <- rep(0, length(x))
+  for(i in 1:length(x)) {
+    to_add <- 10 * exp(-0.5*x[i])
+    to_add <- to_add * sin(5*x[i])
+    if(x[i] < 1) {
+      y[i] <- 0 + to_add
+    } else if(x[i] > 9) {
+      y[i] <- 40 + to_add
+    } else {
+      y[i] <- (5*x[i]) - 5 + to_add
+    }
+  }
+  return(y)
+}
 
 
+get_table <- function(slopes) {
+  unique_vals <- unique(slopes)
+  retVal <- rbind(label=unique_vals, count=sapply(unique_vals,function(x)sum(slopes==x)))
+  return(retVal)
+}
 
+get_weights_endpoints <- function (vals, results, col_select) {
+  weights <- c()
+  for(v in vals$val) {
+    v_scenarios <- results[results[col_select] == v,]
+    weight <- sum(v_scenarios$weights) * vals$Freq
+    weights <- append(weights, weight)
+  }
+  return(data.frame(vals$val,weights))
+}
 
 
 

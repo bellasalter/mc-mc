@@ -2,11 +2,25 @@
 title: "R Notebook"
 output: html_notebook
 ---
+Notes: when doing a=0.9995 with around steps = 40,000 we get M = 5000 and expected was 4000. 
+as a -> 1, with fixed steps = 40,000 we end up with worse and worse M's sorta proportional to the expected. 
+  a= 0.9995: "Suggested M: 5701.000000, expected 3999.000000"
+  a= 0.995:  "Suggested M: 532.000000, expected 399.000000"
+  a=0.95: "Suggested M: 51.000000, expected 39.000000"
+with steps = 40 * t_exp:
+  a=0.25: "Suggested M: 5.000000, expected 1.666667"
+  a=0.5: "Suggested M: 4.000000, expected 3.000000"
+  a=0.75: 
+  a=0.9: "Suggested M: 21.000000, expected 19.000000"
+-> steps = 40 * t_exp actually better than a ton of steps in some cases, due to selection of C?
+  
+  
 ```{r}
 # Dependencies
 library(ggplot2)
 library(LaplacesDemon)
 source("./generic.R")
+source("./deshMethod.R")
 ```
 
 ```{r}
@@ -15,9 +29,11 @@ acfs <- c()
 ```
 ```{r}
 # Specific to autoregression 
-a = 0.9995
+a = 0.5
 b = 2
-steps = 40000
+exp_m <- 1 + 2*(a/(1-a))
+#steps = 40*exp_m
+steps = 10000
 
 get_next_step <- function(prev) {
   w <- rnorm(n=1, mean=0, sd=1)
@@ -44,19 +60,14 @@ ggplot(state_df, aes(x=states_visited)) + geom_histogram() + stat_function(fun =
 c <- 4 # since we expect an exponential here?
 my_acfs <- c_est_series(states_visited)
 ```
-```{r}
-#my_acfs$acf
-weird_num <- c_est(states_visited, 396)
-```
 
 ```{r}
-M_upper_bound <- 30000
+M_upper_bound <- 6000
 triangle_df <- find_m(my_acfs, c, M_upper_bound)
 length(triangle_df)
 ggplot(triangle_df, aes(x=poss_Ms)) + geom_point(aes(y=ct_ints, color="forestgreen"), size=0.75) + geom_line(aes(y=ct_ints,color="forestgreen")) + geom_line(aes(y=poss_Ms, color="blue")) + ggtitle("Comparing M to c*Tau_int with c=6") + scale_color_manual(name = "", labels = c("M", "c*tau_int(M)"),values = c("forestgreen", "blue"))
 m_suggest <- triangle_df[triangle_df$poss_Ms >= triangle_df$ct_ints,]
 m_suggest <- m_suggest$poss_Ms[1]
-exp_m <- 1 + 2*(a/(1-a))
 sprintf("Suggested M: %f, expected %f", m_suggest, exp_m)
 ```
 ```{r}
@@ -64,12 +75,70 @@ M <- m_suggest
 wind_df <- apply_window(lambda, my_acfs, M)
 ```
 ```{r}
-max_x <- steps / 2
+max_x <- 300
+
 
 plot_df <- wind_df[1:max_x,]
-ggplot(plot_df, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.25) + geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=C_new, color="deeppink"), size=0.25) + geom_line(aes(y=C_new, color="deeppink")) +ggtitle("Triangle windowed C vs. Lag") + scale_color_manual(name = "", labels = c("Original", "New(Triangle)"),values = c("black", "deeppink")) + xlab("Lag") + ylab("C")
+exp_ac <- a ^ plot_df$Lag
+plot_df$exp_ac <- exp_ac
+ggplot(plot_df, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.25) + geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=exp_ac, color="deeppink"), size=0.25) + geom_line(aes(y=exp_ac, color="deeppink")) +ggtitle("Expected Autocorrelation vs. Heuristic") + scale_color_manual(name = "", labels = c("Heuristic", "Expected"),values = c("black", "deeppink")) + xlab("Lag") + ylab("C")
 ```
 ```{r}
 IAT(states_visited)
+```
+
+
+```{r}
+
+```
+
+
+NEW METHOD TEST 1: PIECEWISE       -----------------------
+```{r}
+x_test <- seq(0,10, by= 0.1)
+y_test <- generate_piecewise(x_test)
+plot(x_test, y_test, pch = 19)
+mod_test <- lm(y_test ~ x_test)
+#x[1:100]
+```
+```{r}
+library(gsignal)
+# new scaling region algorithm
+n <- 10 # chosen
+p <- 1 # chosen
+q <- 2 # chosen
+results <- desh_method(x_test, y_test, length(x_test)-1, n, p, q)
+```
+
+```{r}
+vals <- get_slopes_sides(results)
+vals
+```
+NEW METHOD TEST 2       -----------------------
+```{r}
+x_quad <- seq(0,2, by= 0.05)
+y_quad <- x_quad ^ 2
+n <- 10 # chosen
+p <- 1 # chosen
+q <- 2 # chosen
+results_quad <- desh_method(x_quad, y_quad, length(x_quad)-1, n, p, q)
+vals <- get_slopes_sides(results_quad)
+vals
+```
+```{r}
+acf_df <- c_est_series(states_visited)
+y <- get_log(acf_df$acf)
+x <- c(1:length(y))
+plot(x[1:10],y[1:10])
+
+```
+```{r}
+n <- 10 # chosen
+p <- 1 # chosen
+q <- 2 # chosen
+lims <- length(x) / 10
+results_ar1 <- desh_method(x,y, lims, n, p, q)
+vars_ar1 <- get_slopes_sides(results_ar1)
+vars_ar1
 ```
 
