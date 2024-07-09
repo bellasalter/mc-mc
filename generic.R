@@ -159,6 +159,7 @@ get_rhs_weights <- function(results) {
 
 # acfs turn negative, so find first time and discard those data points
 get_log <- function(acfs) {
+  #first_negative <- which(acfs <= 0)[1]
   return(log(abs(acfs)))
 }
 

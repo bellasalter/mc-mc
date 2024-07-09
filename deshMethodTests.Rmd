@@ -1,0 +1,195 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# Dependencies
+library(ggplot2)
+library(LaplacesDemon)
+source("./generic.R")
+source("./deshMethod.R")
+```
+
+```{r}
+states_visited <- c()
+acfs <- c()
+```
+
+```{r}
+# Specific to autoregression 
+a = 0.95
+b = 2
+exp_m <- 1 + 2*(a/(1-a))
+#steps = 40*exp_m
+steps = 10000
+
+get_next_step <- function(prev) {
+  w <- rnorm(n=1, mean=0, sd=1)
+  next_val <- a * prev + b * w
+  return(next_val)
+}
+
+get_init_state <- function( ) {
+  init_sd <- b^2 / (1-a^2)
+  init_state <- rnorm(n=1, mean=0, sd=init_sd)
+  return(init_state)
+}
+```
+
+```{r}
+n <- 10 # chosen
+p <- 1 # chosen
+q <- 1 # chosen
+#lims <- length(x) / 50
+#lim <- 2 * lim
+steps = 10000
+
+# tests
+res_rights <- c()
+for(i in 1:50) {
+  states_visited <- asim(get_init_state(), get_next_step, steps)
+  acf_df <- c_est_series(states_visited)
+  #lim <- x[which(acf_df$acf <= 0)][1]
+  y <- get_log(acf_df$acf)
+  #print(y)
+  x <- c(0:(length(y)-1))
+  lim <- length(y)
+  #lim <- 50
+  results_ar1 <- desh_method(x,y, lim, n, p, q)
+  vars_ar1 <- get_slopes_sides(results_ar1, FALSE)
+  res_rights <- append(res_rights, vars_ar1$best_rhs)
+}
+
+```
+```{r}
+res_rights
+mean(res_rights)
+plot_x <- c(1:length(res_rights))
+exp_m <- 1 + 2*(a/(1-a))
+exp_rep <- rep(exp_m, length(res_rights))
+avg_rep <- rep(mean(res_rights), length(res_rights))
+to_plot <- data.frame(plot_x, res_rights, exp_rep, avg_rep)
+ggplot(to_plot, aes(x=plot_x)) + geom_point(aes(y=res_rights, color="black")) + geom_line(aes(y=exp_rep, color="red")) + geom_line(aes(y=avg_rep)) + xlab("Run") + ylab("Suggested M") + scale_color_manual(name = "", labels = c("Heuristic", "Expected"),values = c("black", "red")) + ggtitle("Suggested Time for Different Runs, a=0.95, p=q=1")
+
+```
+
+```{r}
+poss_as <- c(-0.9, -0.7, -0.5, 0.5, 0.7, 0.9, 0.99)
+dict <- c()
+for(a in poss_as) {
+  states_visited <- asim(get_init_state(), get_next_step, steps)
+  acf_df <- c_est_series(states_visited)
+  dict[as.character(a)] <- acf_df
+}
+```
+
+```{r}
+acf <- dict[as.character(0.99)]
+acf_df <- data.frame(acf)
+colnames(acf_df) <- c("acf")
+```
+```{r}
+poss_ps <- c(0.5, 1, 2, 3, 4)
+poss_qs <- c(0.5, 1, 2, 3, 4)
+
+old_ms <- c()
+new_ms <- c()
+ps <- c()
+qs <- c()
+as <- c()
+real_m <- c()
+results_ar1s <- list()
+
+for(a in poss_as) {
+  acf <- dict[as.character(a)]
+  acf_df <- data.frame(acf)
+  colnames(acf_df) <- c("acf")
+  stop_search <- which(acf_df$acf <= 0)[1]
+  stop_search <- 2 * stop_search
+      
+  if(a < 0) {
+    n <- 3
+  } else {
+    n <- 10
+  }
+  
+  if(stop_search < 5) {
+    stop_search <- 10
+  }
+  y <- get_log(acf_df$acf)[1:stop_search]
+  x <- c(0:(stop_search-1))
+  lim <- length(y)
+  results_ar1 <- desh_method(x,y, lim, n)
+  results_ar1s <- append(results_ar1s, results_ar1)
+}
+```
+```{r}
+old_ms <- c()
+new_ms <- c()
+ps <- c()
+qs <- c()
+as <- c()
+real_m <- c()
+
+for(a in poss_as) {
+  print(a)
+  start_time <- Sys.time()
+  c <- 4
+  M_upper_bound <- 6000
+  triangle_df <- find_m(acf_df, c, M_upper_bound)
+  m_suggest <- triangle_df[triangle_df$poss_Ms >= triangle_df$ct_ints,]
+  m_suggest <- m_suggest$poss_Ms[1]
+  
+  acf <- dict[as.character(a)]
+  acf_df <- data.frame(acf)
+  colnames(acf_df) <- c("acf")
+  stop_search <- which(acf_df$acf <= 0)[1]
+  stop_search <- 1.5 * stop_search
+      
+  if(a < 0) {
+    n <- 3
+  } else {
+    n <- 10
+  }
+  
+  if(stop_search < 5 ) {
+    stop_search <- 10
+  }
+  y <- get_log(acf_df$acf)[1:stop_search]
+  x <- c(0:(stop_search-1))
+  lim <- length(y)
+  results_ar1 <- desh_method(x,y, lim, n)
+  
+  
+  for(p in poss_ps) {
+    for(q in poss_qs) {
+        exp_m <- 1 + 2*(a/(1-a))
+        real_m <- append(real_m, exp_m)
+        old_ms <- append(old_ms, m_suggest)
+        
+        #results_ar1 <- results_ar1s[curr_a]
+        #print(results_ar1)
+        new_weights <- get_desh_weights(results_ar1,  p, q)
+        print(new_weights)
+        vars_ar1 <- get_slopes_sides(results_ar1, new_weights, FALSE)
+        new_ms <- append(new_ms, vars_ar1$best_rhs)
+        
+        ps <- append(ps, p)
+        qs <- append(qs, q)
+        as <- append(as, a)
+    }
+  }
+  end_time <- Sys.time()
+  print(end_time - start_time)
+}
+
+```
+```{r}
+
+results <- data.frame(old_ms, new_ms, ps, qs, as, real_m)
+results
+colnames(results) <- c("Old Method", "New method", "p", "q", "a", "Real Time")
+results
+write.csv(results, "./results.csv", row.names = FALSE)
+```

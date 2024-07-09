@@ -29,7 +29,7 @@ acfs <- c()
 ```
 ```{r}
 # Specific to autoregression 
-a = 0.5
+a = 0.95
 b = 2
 exp_m <- 1 + 2*(a/(1-a))
 #steps = 40*exp_m
@@ -107,10 +107,12 @@ library(gsignal)
 n <- 10 # chosen
 p <- 1 # chosen
 q <- 2 # chosen
-results <- desh_method(x_test, y_test, length(x_test)-1, n, p, q)
+lim1 <- 9
+results <- desh_method(x_test, y_test, lim1, n, p, q)
 ```
 
 ```{r}
+results
 vals <- get_slopes_sides(results)
 vals
 ```
@@ -127,18 +129,42 @@ vals
 ```
 ```{r}
 acf_df <- c_est_series(states_visited)
+acf_df
+```
+```{r}
+lim <- x[which(acf_df$acf <= 0)][1]
 y <- get_log(acf_df$acf)
-x <- c(1:length(y))
-plot(x[1:10],y[1:10])
-
+x <- c(0:length(y))
+```
+```{r}
+exp_m <- 1 + 2*(a/(1-a))
+to_plot <- data.frame(x[1:70], y[1:70], acf_df$acf[1:70])
+colnames(to_plot) <- c("x", "y", "acf")
+to_plot
+ggplot(to_plot, aes(x=x, y=y)) + geom_point()
+ggplot(to_plot, aes(x=x, y=acf)) + geom_point() + geom_line()
 ```
 ```{r}
 n <- 10 # chosen
 p <- 1 # chosen
-q <- 2 # chosen
-lims <- length(x) / 10
-results_ar1 <- desh_method(x,y, lims, n, p, q)
+q <- 1 # chosen
+#lims <- length(x) / 50
+lim <- 2 * lim
+results_ar1 <- desh_method(x,y, lim, n, p, q)
+
+```
+```{r}
+results_ar1$xR[which.max(results_ar1$new_weights)]
+results_ar1
 vars_ar1 <- get_slopes_sides(results_ar1)
 vars_ar1
+```
+```{r}
+Ωzzzzzz
+mine <- vars_ar1$best_rhs
+```
+```{r}
+iat <- IAT(states_visited)
+sprintf("a= %f: Expected= %f, Mine= %f, IAT function= %f", a, exp_m, mine, iat)
 ```
 

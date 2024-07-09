@@ -1,8 +1,8 @@
 
 library(gsignal)
-library("./generic.R")
+source("./generic.R")
 
-desh_method <- function(x, y, lims, n, p, q) {
+desh_method <- function(x, y, lims, n) {
   slopes <- c()
   lengths <- c()
   errs <- c()
@@ -29,16 +29,25 @@ desh_method <- function(x, y, lims, n, p, q) {
         xL <- append(xL, x[lhs])
         xR <- append(xR, x[rhs])
         
-        weight <- (fit_length ^ p) / (fit_err ^ q)
-        new_weights <- append(new_weights, weight)
         ints <- append(ints, c)
       }
     }
   }
   end_time <- Sys.time()
   print(end_time - start_time)
-  retVal <- data.frame(slopes, lengths, errs, xL, xR, new_weights, ints)
+  retVal <- data.frame(slopes, lengths, errs, xL, xR, ints)
   return(retVal)
+}
+
+get_desh_weights <- function(results, p, q) {
+  new_weights <- c()
+  #print(results)
+  for(row in c(1:nrow(results))) {
+    weight <- (results$lengths[row] ^ p) / (results$errs[row] ^ q)
+    new_weights <- append(new_weights, weight)
+  }
+  print(length(new_weights))
+  return(new_weights)
 }
 
 get_fit_length <- function(rhs_val, lhs_val,m) {
@@ -57,23 +66,27 @@ get_fit_err <- function(x, y, m, c, lhs, rhs) {
   return(num / denom)
 }
 
-get_slopes_sides <- function(results) {
-  kern <- density(results$slopes, bw = "nrd", adjust = 0.25 , kernel = "gaussian" , weights = results$new_weights)
-  plot(kern$x, kern$y, pch = 19)
+get_slopes_sides <- function(results, weights, plot=TRUE) {
+  kern <- density(results$slopes, bw = "nrd", adjust = 0.25 , kernel = "gaussian" , weights = weights)
   best_slope <- kern$x[which.max(kern$y)]
-  best_slope
   
-  lhs_weighted <- get_lhs_weights(results)
-  lhs_kern <- density(lhs_weighted$unique_lhs, bw = "nrd", adjust = 0.25, kernel = "gaussian" ,weights = lhs_weighted$weights)
-  plot(lhs_kern$x, lhs_kern$y, pch = 19)
-  best_lhs <- lhs_kern$x[which.max(lhs_kern$y)]
+  #lhs_weighted <- get_lhs_weights(results)
+  #lhs_kern <- density(results$xL, bw = "nrd", adjust = .1, kernel = "gaussian" ,weights = results$new_weights)
+  #lhs_kern <- density(lhs_weighted$unique_lhs, bw = "nrd", adjust = 0.25, kernel = "gaussian" ,weights = lhs_weighted$weights)
+  #plot(lhs_kern$x, lhs_kern$y, pch = 19)
+  #best_lhs <- lhs_kern$x[which.max(lhs_kern$y)]
+  best_lhs <- 0
   best_lhs
   
   #rhs_weighted <- get_rhs_weights(results)
-  rhs_kern <- density(results$xR, bw = "nrd",adjust = 0.25, kernel = "gaussian" ,weights = results$new_weights)
-  plot(rhs_kern$x, rhs_kern$y, pch = 19)
+  rhs_kern <- density(results$xR, bw = "nrd",adjust = 0.75, kernel = "gaussian" ,weights = weights)
   best_rhs <- rhs_kern$x[which.max(rhs_kern$y)]
-  best_rhs
+  
+  if(plot) {
+    plot(kern$x, kern$y, pch = 19)
+    plot(rhs_kern$x, rhs_kern$y, pch = 19)
+    
+  }
   
   retVal <- data.frame(best_slope, best_lhs, best_rhs)
   return(retVal)
