@@ -81,6 +81,8 @@ max_x <- 300
 plot_df <- wind_df[1:max_x,]
 exp_ac <- a ^ plot_df$Lag
 plot_df$exp_ac <- exp_ac
+```
+```{r}
 ggplot(plot_df, aes(x=Lag)) + geom_point(aes(y=C_orig, color="black"), size=0.25) + geom_line(aes(y=C_orig, color="black")) + geom_point(aes(y=exp_ac, color="deeppink"), size=0.25) + geom_line(aes(y=exp_ac, color="deeppink")) +ggtitle("Expected Autocorrelation vs. Heuristic") + scale_color_manual(name = "", labels = c("Heuristic", "Expected"),values = c("black", "deeppink")) + xlab("Lag") + ylab("C")
 ```
 ```{r}

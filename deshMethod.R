@@ -39,10 +39,13 @@ desh_method <- function(x, y, lims, n) {
   return(retVal)
 }
 
-get_desh_weights <- function(results, p, q) {
+get_desh_weights <- function(results, p, q, r) {
   new_weights <- c()
   #print(results)
   for(row in c(1:nrow(results))) {
+    if (results$xL[row] == 0) {
+      results$xL[row] <- 0.1
+    }
     weight <- (results$lengths[row] ^ p) / (results$errs[row] ^ q)
     new_weights <- append(new_weights, weight)
   }
@@ -71,20 +74,21 @@ get_slopes_sides <- function(results, weights, plot=TRUE) {
   best_slope <- kern$x[which.max(kern$y)]
   
   #lhs_weighted <- get_lhs_weights(results)
-  #lhs_kern <- density(results$xL, bw = "nrd", adjust = .1, kernel = "gaussian" ,weights = results$new_weights)
+  lhs_kern <- density(results$xL, bw = "nrd", adjust = .1, kernel = "gaussian" ,weights = weights)
   #lhs_kern <- density(lhs_weighted$unique_lhs, bw = "nrd", adjust = 0.25, kernel = "gaussian" ,weights = lhs_weighted$weights)
   #plot(lhs_kern$x, lhs_kern$y, pch = 19)
-  #best_lhs <- lhs_kern$x[which.max(lhs_kern$y)]
-  best_lhs <- 0
+  best_lhs <- lhs_kern$x[which.max(lhs_kern$y)]
+  #best_lhs <- 0
   best_lhs
   
   #rhs_weighted <- get_rhs_weights(results)
-  rhs_kern <- density(results$xR, bw = "nrd",adjust = 0.75, kernel = "gaussian" ,weights = weights)
+  rhs_kern <- density(results$xR, bw = "nrd",adjust = 1, kernel = "gaussian" ,weights = weights)
   best_rhs <- rhs_kern$x[which.max(rhs_kern$y)]
   
   if(plot) {
     plot(kern$x, kern$y, pch = 19)
     plot(rhs_kern$x, rhs_kern$y, pch = 19)
+    plot(lhs_kern$x, lhs_kern$y, pch = 19)
     
   }
   

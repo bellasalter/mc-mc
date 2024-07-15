@@ -39,27 +39,35 @@ get_init_state <- function( ) {
 
 ```{r}
 n <- 10 # chosen
-p <- 1 # chosen
-q <- 1 # chosen
+p <- 3 # chosen
+q <- 3 # chosen
 #lims <- length(x) / 50
 #lim <- 2 * lim
 steps = 10000
-
+a <- 0.9
+r <- 0
 # tests
 res_rights <- c()
-for(i in 1:50) {
+#for(i in 1:2) {
   states_visited <- asim(get_init_state(), get_next_step, steps)
   acf_df <- c_est_series(states_visited)
+  
+  stop_search <- which(acf_df$acf <= 0)[1]
   #lim <- x[which(acf_df$acf <= 0)][1]
-  y <- get_log(acf_df$acf)
-  #print(y)
-  x <- c(0:(length(y)-1))
+  stop_search <- 1.5 * stop_search
+  y <- get_log(acf_df$acf)[1:stop_search]
+  x <- c(0:(stop_search-1))
   lim <- length(y)
   #lim <- 50
-  results_ar1 <- desh_method(x,y, lim, n, p, q)
-  vars_ar1 <- get_slopes_sides(results_ar1, FALSE)
-  res_rights <- append(res_rights, vars_ar1$best_rhs)
-}
+  results_ar1 <- desh_method(x,y, lim, n)
+  new_weights <- get_desh_weights(results_ar1,  p, q, r)
+  vars_ar1 <- get_slopes_sides(results_ar1, new_weights, TRUE)
+#}
+```
+```{r}
+vars_ar1
+exp_m <- 1 + 2*(a/(1-a))
+exp_m
 
 ```
 ```{r}
@@ -90,8 +98,9 @@ acf_df <- data.frame(acf)
 colnames(acf_df) <- c("acf")
 ```
 ```{r}
-poss_ps <- c(0.5, 1, 2, 3, 4)
-poss_qs <- c(0.5, 1, 2, 3, 4)
+poss_ps <- c(0.5, 1, 2, 3)
+poss_qs <- c(0.5, 1, 2, 3)
+poss_rs <- c(0)
 
 old_ms <- c()
 new_ms <- c()
@@ -110,6 +119,8 @@ for(a in poss_as) {
       
   if(a < 0) {
     n <- 3
+  } else if(stop_search > 500) {
+    stop_search <- 500
   } else {
     n <- 10
   }
@@ -131,6 +142,7 @@ ps <- c()
 qs <- c()
 as <- c()
 real_m <- c()
+rs <- c()
 
 for(a in poss_as) {
   print(a)
@@ -149,6 +161,8 @@ for(a in poss_as) {
       
   if(a < 0) {
     n <- 3
+  } else if(stop_search > 500) {
+    stop_search <- 500
   } else {
     n <- 10
   }
@@ -164,20 +178,22 @@ for(a in poss_as) {
   
   for(p in poss_ps) {
     for(q in poss_qs) {
+       for(r in poss_rs) {
         exp_m <- 1 + 2*(a/(1-a))
         real_m <- append(real_m, exp_m)
         old_ms <- append(old_ms, m_suggest)
         
         #results_ar1 <- results_ar1s[curr_a]
         #print(results_ar1)
-        new_weights <- get_desh_weights(results_ar1,  p, q)
-        print(new_weights)
+        new_weights <- get_desh_weights(results_ar1,  p, q, r)
         vars_ar1 <- get_slopes_sides(results_ar1, new_weights, FALSE)
         new_ms <- append(new_ms, vars_ar1$best_rhs)
         
         ps <- append(ps, p)
         qs <- append(qs, q)
         as <- append(as, a)
+        rs <- append(rs, r)
+       }
     }
   }
   end_time <- Sys.time()
@@ -186,10 +202,47 @@ for(a in poss_as) {
 
 ```
 ```{r}
-
 results <- data.frame(old_ms, new_ms, ps, qs, as, real_m)
-results
 colnames(results) <- c("Old Method", "New method", "p", "q", "a", "Real Time")
-results
 write.csv(results, "./results.csv", row.names = FALSE)
+results
+```
+```{r}
+results$err_vs_real <- (results["Real Time"] - results["New method"]) / results["Real Time"]
+results$err_vs_real$`Real Time`
+results[which.min(abs(results$err_vs_real$`Real Time`)),]
+```
+```{r}
+# downsampling
+autocorrs <- acf_df
+selected <- seq(1, nrow(autocorrs), 4)
+autocorrs <- autocorrs[selected,]
+autocorrs <- data.frame(autocorrs)
+colnames(autocorrs) <- c("acf")
+a <- a
+print(a)
+stop_search <- which(autocorrs$acf <= 0)[1]
+  stop_search <- 1.5 * stop_search
+      
+  if(a < 0) {
+    n <- 3
+  } else if(stop_search > 500) {
+    stop_search <- 500
+  } else {
+    n <- 10
+  }
+  
+  if(stop_search < 5 ) {
+    stop_search <- 10
+  }
+  y <- get_log(autocorrs$acf)[1:stop_search]
+  x <- c(0:(stop_search-1))
+  lim <- length(y)
+  results_ar1 <- desh_method(x,y, lim, n)
+print(results_ar1)
+p<-3
+q<-3
+new_weights <- get_desh_weights(results_ar1,  p, q, r)
+vars_ar1 <- get_slopes_sides(results_ar1, new_weights, FALSE)
+vars_ar1
 ```
