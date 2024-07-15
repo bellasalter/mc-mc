@@ -2,6 +2,7 @@
 library(gsignal)
 source("./generic.R")
 
+# Performs the algorithm from the paper. 
 desh_method <- function(x, y, lims, n) {
   slopes <- c()
   lengths <- c()
@@ -41,7 +42,6 @@ desh_method <- function(x, y, lims, n) {
 
 get_desh_weights <- function(results, p, q, r) {
   new_weights <- c()
-  #print(results)
   for(row in c(1:nrow(results))) {
     if (results$xL[row] == 0) {
       results$xL[row] <- 0.1
@@ -69,19 +69,14 @@ get_fit_err <- function(x, y, m, c, lhs, rhs) {
   return(num / denom)
 }
 
+# Uses KDEs for each slope and side using the weights, returning a data frame of the recommended values. 
 get_slopes_sides <- function(results, weights, plot=TRUE) {
   kern <- density(results$slopes, bw = "nrd", adjust = 0.25 , kernel = "gaussian" , weights = weights)
   best_slope <- kern$x[which.max(kern$y)]
   
-  #lhs_weighted <- get_lhs_weights(results)
   lhs_kern <- density(results$xL, bw = "nrd", adjust = .1, kernel = "gaussian" ,weights = weights)
-  #lhs_kern <- density(lhs_weighted$unique_lhs, bw = "nrd", adjust = 0.25, kernel = "gaussian" ,weights = lhs_weighted$weights)
-  #plot(lhs_kern$x, lhs_kern$y, pch = 19)
   best_lhs <- lhs_kern$x[which.max(lhs_kern$y)]
-  #best_lhs <- 0
-  best_lhs
   
-  #rhs_weighted <- get_rhs_weights(results)
   rhs_kern <- density(results$xR, bw = "nrd",adjust = 1, kernel = "gaussian" ,weights = weights)
   best_rhs <- rhs_kern$x[which.max(rhs_kern$y)]
   

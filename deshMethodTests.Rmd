@@ -3,6 +3,8 @@ title: "R Notebook"
 output: html_notebook
 ---
 
+This R notebook conducts various tests using the method outlined in Toward automated extraction and characterization of scaling regions in dynamical systems.
+
 ```{r}
 # Dependencies
 library(ggplot2)
@@ -21,7 +23,6 @@ acfs <- c()
 a = 0.95
 b = 2
 exp_m <- 1 + 2*(a/(1-a))
-#steps = 40*exp_m
 steps = 10000
 
 get_next_step <- function(prev) {
@@ -38,52 +39,39 @@ get_init_state <- function( ) {
 ```
 
 ```{r}
+# example method with one simulation using one set of p, q
+# also plots histograms here. 
 n <- 10 # chosen
 p <- 3 # chosen
-q <- 3 # chosen
-#lims <- length(x) / 50
-#lim <- 2 * lim
+q <- 3 # chosen 
 steps = 10000
 a <- 0.9
 r <- 0
-# tests
-res_rights <- c()
-#for(i in 1:2) {
-  states_visited <- asim(get_init_state(), get_next_step, steps)
-  acf_df <- c_est_series(states_visited)
-  
-  stop_search <- which(acf_df$acf <= 0)[1]
-  #lim <- x[which(acf_df$acf <= 0)][1]
-  stop_search <- 1.5 * stop_search
-  y <- get_log(acf_df$acf)[1:stop_search]
-  x <- c(0:(stop_search-1))
-  lim <- length(y)
-  #lim <- 50
-  results_ar1 <- desh_method(x,y, lim, n)
-  new_weights <- get_desh_weights(results_ar1,  p, q, r)
-  vars_ar1 <- get_slopes_sides(results_ar1, new_weights, TRUE)
-#}
-```
-```{r}
+
+states_visited <- asim(get_init_state(), get_next_step, steps)
+acf_df <- c_est_series(states_visited)
+
+# limiting the search to a finite number, since takes a long time computationally
+stop_search <- which(acf_df$acf <= 0)[1]
+stop_search <- 1.5 * stop_search
+
+y <- get_log(acf_df$acf)[1:stop_search]
+x <- c(0:(stop_search-1))
+lim <- length(y)
+results_ar1 <- desh_method(x,y, lim, n)
+new_weights <- get_desh_weights(results_ar1,  p, q, r)
+vars_ar1 <- get_slopes_sides(results_ar1, new_weights, TRUE)
 vars_ar1
 exp_m <- 1 + 2*(a/(1-a))
-exp_m
-
-```
-```{r}
-res_rights
-mean(res_rights)
-plot_x <- c(1:length(res_rights))
-exp_m <- 1 + 2*(a/(1-a))
-exp_rep <- rep(exp_m, length(res_rights))
-avg_rep <- rep(mean(res_rights), length(res_rights))
-to_plot <- data.frame(plot_x, res_rights, exp_rep, avg_rep)
-ggplot(to_plot, aes(x=plot_x)) + geom_point(aes(y=res_rights, color="black")) + geom_line(aes(y=exp_rep, color="red")) + geom_line(aes(y=avg_rep)) + xlab("Run") + ylab("Suggested M") + scale_color_manual(name = "", labels = c("Heuristic", "Expected"),values = c("black", "red")) + ggtitle("Suggested Time for Different Runs, a=0.95, p=q=1")
-
+sprintf("Resulting RHS : %f, expected time: %f", vars_ar1$best_rhs, exp_m)
 ```
 
+This is the big test-- does the method for many different a's, p's, and q's. 
+
 ```{r}
+# Generates simulations for each possible a we want to test, storing results in a dictionary. 
 poss_as <- c(-0.9, -0.7, -0.5, 0.5, 0.7, 0.9, 0.99)
+steps = 10000
 dict <- c()
 for(a in poss_as) {
   states_visited <- asim(get_init_state(), get_next_step, steps)
@@ -93,11 +81,8 @@ for(a in poss_as) {
 ```
 
 ```{r}
-acf <- dict[as.character(0.99)]
-acf_df <- data.frame(acf)
-colnames(acf_df) <- c("acf")
-```
-```{r}
+# Then we try the method on each simulation.
+# Start by finding the autocorrelation functions. 
 poss_ps <- c(0.5, 1, 2, 3)
 poss_qs <- c(0.5, 1, 2, 3)
 poss_rs <- c(0)
@@ -136,6 +121,7 @@ for(a in poss_as) {
 }
 ```
 ```{r}
+# Then try the method on the given autocorrelation functions.
 old_ms <- c()
 new_ms <- c()
 ps <- c()
@@ -182,9 +168,7 @@ for(a in poss_as) {
         exp_m <- 1 + 2*(a/(1-a))
         real_m <- append(real_m, exp_m)
         old_ms <- append(old_ms, m_suggest)
-        
-        #results_ar1 <- results_ar1s[curr_a]
-        #print(results_ar1)
+
         new_weights <- get_desh_weights(results_ar1,  p, q, r)
         vars_ar1 <- get_slopes_sides(results_ar1, new_weights, FALSE)
         new_ms <- append(new_ms, vars_ar1$best_rhs)
@@ -202,6 +186,7 @@ for(a in poss_as) {
 
 ```
 ```{r}
+# Formatting and storing results
 results <- data.frame(old_ms, new_ms, ps, qs, as, real_m)
 colnames(results) <- c("Old Method", "New method", "p", "q", "a", "Real Time")
 write.csv(results, "./results.csv", row.names = FALSE)
@@ -213,7 +198,7 @@ results$err_vs_real$`Real Time`
 results[which.min(abs(results$err_vs_real$`Real Time`)),]
 ```
 ```{r}
-# downsampling
+# attempting downsampling
 autocorrs <- acf_df
 selected <- seq(1, nrow(autocorrs), 4)
 autocorrs <- autocorrs[selected,]
