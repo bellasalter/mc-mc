@@ -139,6 +139,7 @@ for(a in poss_as) {
   triangle_df <- find_m(acf_df, c, M_upper_bound)
   m_suggest <- triangle_df[triangle_df$poss_Ms >= triangle_df$ct_ints,]
   m_suggest <- m_suggest$poss_Ms[1]
+  m_suggest <- t_int(m_suggest, acf_df)
   
   acf <- dict[as.character(a)]
   acf_df <- data.frame(acf)
@@ -150,9 +151,7 @@ for(a in poss_as) {
     n <- 3
   } else if(stop_search > 500) {
     stop_search <- 500
-  } #else {
-    #n <- 10
-  #}
+  }
   
   if(stop_search < 5 ) {
     stop_search <- 10
@@ -171,7 +170,7 @@ for(a in poss_as) {
         old_ms <- append(old_ms, m_suggest)
 
         new_weights <- get_desh_weights(results_ar1,  p, q, r)
-        vars_ar1 <- get_slopes_sides(results_ar1, new_weights) #automatically plots RHS 
+        vars_ar1 <- get_slopes_sides(results_ar1, new_weights, plot_title=sprintf("a:%f, p:%f, q:%f", a, p, q)) #automatically plots RHS 
         new_ms <- append(new_ms, vars_ar1$best_rhs)
         
         ps <- append(ps, p)

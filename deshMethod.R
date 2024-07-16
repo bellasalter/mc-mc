@@ -67,14 +67,14 @@ get_fit_err <- function(x, y, m, c, lhs, rhs) {
 }
 
 # Uses KDEs for each slope and side using the weights, returning a data frame of the recommended values. 
-get_slopes_sides <- function(results, weights, plot_right=TRUE, plot_others=FALSE) {
+get_slopes_sides <- function(results, weights, plot_title = "",plot_right=TRUE, plot_others=FALSE) {
   kern <- density(results$slopes, bw = "nrd", adjust = 0.25 , kernel = "gaussian" , weights = weights)
   best_slope <- kern$x[which.max(kern$y)]
   
   lhs_kern <- density(results$xL, bw = "nrd", adjust = .1, kernel = "gaussian" ,weights = weights)
   best_lhs <- lhs_kern$x[which.max(lhs_kern$y)]
   
-  rhs_kern <- density(results$xR, bw = "nrd",adjust = 1.75, kernel = "gaussian" ,weights = weights)
+  rhs_kern <- density(results$xR, bw = "nrd",adjust = 1.5, kernel = "gaussian" ,weights = weights)
   best_rhs <- rhs_kern$x[which.max(rhs_kern$y)]
   
   if(plot_others) {
@@ -84,6 +84,7 @@ get_slopes_sides <- function(results, weights, plot_right=TRUE, plot_others=FALS
   
   if(plot_right) {
     plot(rhs_kern$x, rhs_kern$y, pch = 16)
+    title(plot_title)
   }
   
   retVal <- data.frame(best_slope, best_lhs, best_rhs)
