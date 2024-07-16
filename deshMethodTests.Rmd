@@ -70,7 +70,8 @@ This is the big test-- does the method for many different a's, p's, and q's.
 
 ```{r}
 # Generates simulations for each possible a we want to test, storing results in a dictionary. 
-poss_as <- c(-0.9, -0.7, -0.5, 0.5, 0.7, 0.9, 0.99)
+#poss_as <- c(-0.9, -0.7, -0.5, 0.5, 0.7, 0.9, 0.99)
+poss_as <- c(0.5, 0.7, 0.9, 0.99)
 steps = 10000
 dict <- c()
 for(a in poss_as) {
@@ -83,8 +84,8 @@ for(a in poss_as) {
 ```{r}
 # Then we try the method on each simulation.
 # Start by finding the autocorrelation functions. 
-poss_ps <- c(0.5, 1, 2, 3)
-poss_qs <- c(0.5, 1, 2, 3)
+poss_ps <- c(1, 2, 3)
+poss_qs <- c(1, 2, 3)
 poss_rs <- c(0)
 
 old_ms <- c()
@@ -149,9 +150,9 @@ for(a in poss_as) {
     n <- 3
   } else if(stop_search > 500) {
     stop_search <- 500
-  } else {
-    n <- 10
-  }
+  } #else {
+    #n <- 10
+  #}
   
   if(stop_search < 5 ) {
     stop_search <- 10
@@ -170,7 +171,7 @@ for(a in poss_as) {
         old_ms <- append(old_ms, m_suggest)
 
         new_weights <- get_desh_weights(results_ar1,  p, q, r)
-        vars_ar1 <- get_slopes_sides(results_ar1, new_weights, FALSE)
+        vars_ar1 <- get_slopes_sides(results_ar1, new_weights) #automatically plots RHS 
         new_ms <- append(new_ms, vars_ar1$best_rhs)
         
         ps <- append(ps, p)
@@ -193,9 +194,8 @@ write.csv(results, "./results.csv", row.names = FALSE)
 results
 ```
 ```{r}
-results$err_vs_real <- (results["Real Time"] - results["New method"]) / results["Real Time"]
-results$err_vs_real$`Real Time`
-results[which.min(abs(results$err_vs_real$`Real Time`)),]
+# plotting the densities for the best p, q for each a
+
 ```
 ```{r}
 # attempting downsampling
