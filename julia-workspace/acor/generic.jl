@@ -74,6 +74,7 @@ function calc_t_series(poss_Ms, acfs)
     return retVal
 end
 
+# Finds the first index where arr1 > arr2
 function find_greater(arr1, arr2) 
     for val in 1:length(arr1)
         if arr1[val] > arr2[val]
@@ -83,6 +84,7 @@ function find_greater(arr1, arr2)
     return -1
 end
 
+# Does Sokal's method from the book
 function sokal(acfs, c) 
     poss_Ms = 1:(length(acfs)-1)
     t_series = calc_t_series(poss_Ms, acfs)
